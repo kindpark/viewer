@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sekai.best Ranking Tracker</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>Sekai.best 이벤트 랭킹 & 컷트라인 추이</h1>
+        <label for="eventIdInput">이벤트 ID: </label>
+        <input type="number" id="eventIdInput" value="219">
+        <button id="loadBtn">조회</button>
+    </header>
+
+    <div class="grid">
+        <!-- 좌측: 현재 시점 리더보드 -->
+        <div class="card">
+            <h2>최신 랭킹 리더보드</h2>
+            <table>
+                <thead>
+                <tr>
+                    <th>순위</th>
+                    <th>프로필</th>
+                    <th>유저명</th>
+                    <th>점수</th>
+                </tr>
+                </thead>
+                <tbody id="rankingTableBody">
+                <tr><td colspan="3">데이터를 불러오는 중...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 우측: 등수별 컷트라인 그래프 -->
+        <div class="card">
+            <h2 id="chartTitle">등수별 점수 컷트라인 추이</h2>
+            <div class="chart-container" style="position: relative; height:400px;">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="main.js"></script>
+</body>
+</html>
