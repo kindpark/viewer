@@ -1,3 +1,5 @@
+const DEFAULT_CARD = 'https://storage.sekai.best/sekai-jp-assets/thumbnail/chara/res001_no011_after_training.webp';
+
 let chartInstance = null;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -30,37 +32,32 @@ async function loadLatestRankings() {
             const tr = document.createElement('tr');
             tr.style.cursor = 'pointer';
 
-            //API 응답 구조(rankNum 또는 rank)에서 정확한 등수 값 안전하게 추출
             const actualRank = item.rankNum !== undefined ? item.rankNum : item.rank;
-
-            //DOM dataset 속성에 확실하게 주입
             tr.setAttribute('data-rank', actualRank);
 
-            const defaultCard = 'https://storage.sekai.best/sekai-jp-assets/thumbnail/chara/res001_no011_after_training.webp';
-            const cardImgUrl = item.userIconUrl || defaultCard;
-            // 2. 속성(Attribute) 아이콘 경로 (기본값: cool)
-                        const attrType = item.attrType || 'cool';
-                        const attrIconUrl = `https://storage.sekai.best/sekai-jp-assets/icon/attr/${attrType}.png`;
+            // 초기 1차 렌더링용 데이터 설정
+            const cardImgUrl = item.userIconUrl || DEFAULT_CARD;
+            const attrType = item.attrType || 'cool';
+            const attrIconUrl = `https://storage.sekai.best/sekai-jp-assets/icon/attr/${attrType}.png`;
+            const rarity = item.rarity || 4;
+            const isAfterTraining = item.isAfterTraining === true;
+            const starClass = isAfterTraining ? 'star after-training' : 'star normal';
+            const starsHtml = Array(rarity).fill(`<span class="${starClass}">★</span>`).join('');
+            const cardLevel = item.cardLevel || 1;
 
-                        // 3. 레어리티 별(Star) HTML 생성 (각성 완료 시 보라색 별, 미각성 시 노란색 별)
-                        const rarity = item.rarity || 4;
-                        const isAfterTraining = item.isAfterTraining === true;
-                        const starClass = isAfterTraining ? 'star after-training' : 'star normal';
-                        const starsHtml = Array(rarity).fill(`<span class="${starClass}">★</span>`).join('');
+            // DOM 요소 고유 구분을 위해 userId 식별자 등록
+            const rowClassId = item.userId ? `user-row-${item.userId}` : '';
 
-                        // 4. 카드 레벨
-                        const cardLevel = item.cardLevel || 1;
-// 5. 오버레이 레이어가 합성된 innerHTML 구성
             tr.innerHTML = `
                 <td>${actualRank}</td>
                 <td>
-                    <div class="card-frame">
+                    <div class="card-frame ${rowClassId}">
                         <!-- Layer 1: 메인 썸네일 -->
                         <img class="card-thumb"
                              src="${cardImgUrl}"
                              alt="card profile"
                              referrerpolicy="no-referrer"
-                             onerror="this.onerror=null; this.src='${defaultCard}';" />
+                             onerror="this.onerror=null; this.src='${DEFAULT_CARD}';" />
 
                         <!-- Layer 2: 좌상단 속성 아이콘 -->
                         <img class="card-attr"
@@ -75,11 +72,11 @@ async function loadLatestRankings() {
                         <div class="card-level">Lv.${cardLevel}</div>
                     </div>
                 </td>
-                <td>${escapeHtml(item.playerName)}</td>
+                <td>${escapeHtml(item.playerName || item.userName)}</td>
                 <td>${item.score ? Number(item.score).toLocaleString() : 0}</td>
             `;
 
-            // [수정 3] 클릭 시 e.currentTarget.getAttribute('data-rank')로 확실하게 가져옴
+            // 단일 등수 클릭 이벤트
             tr.addEventListener('click', (e) => {
                 const targetTr = e.currentTarget;
                 const clickedRank = targetTr.getAttribute('data-rank');
@@ -96,7 +93,63 @@ async function loadLatestRankings() {
         tableBody.innerHTML = '<tr><td colspan="4">데이터 로딩 실패</td></tr>';
     }
 }
+/**
+ * 외부 프로필 API를 비동기 조회의해 카드 썸네일 및 오버레이 에셋을 실시간 업데이트
+ */
+async function fetchUserProfileAndOverlays(userId, cardFrameElement) {
+    if (!cardFrameElement) return;
 
+    try {
+        // sekai.best 유저 프로필 조회 API 엔드포인트
+        const res = await fetch(`https://api.sekai.best/user/${userId}/profile`);
+        if (!res.ok) return;
+
+        const data = await res.json();
+
+        // 1. 착용 대표 카드 데이터 추출 (유저 착용 카드 정보)
+        const userCard = data.userCard || data.userDeck?.leaderCard || null;
+        if (!userCard) return;
+
+        const assetbundleName = userCard.assetbundleName || userCard.card?.assetbundleName;
+        const defaultImage = userCard.defaultImage || (userCard.specialTrainingStatus === 'done' ? 'after_training' : 'normal');
+
+        // 2. 카드 썸네일 URL 조합 (sekai.best CDN)
+        if (assetbundleName) {
+            const thumbUrl = `https://storage.sekai.best/sekai-jp-assets/thumbnail/chara/${assetbundleName}_${defaultImage}.webp`;
+            const thumbImg = cardFrameElement.querySelector('.card-thumb');
+            if (thumbImg) thumbImg.src = thumbUrl;
+        }
+
+        // 3. 카드 속성(Attribute) 갱신
+        const attr = userCard.attr || userCard.card?.attr;
+        if (attr) {
+            const attrImg = cardFrameElement.querySelector('.card-attr');
+            if (attrImg) {
+                attrImg.src = `https://storage.sekai.best/sekai-jp-assets/icon/attr/${attr}.png`;
+                attrImg.style.display = 'block';
+            }
+        }
+
+        // 4. 레어리티 및 각성 상태별 별(Star) 갱신
+        const rarity = userCard.rarity || userCard.card?.rarity || 4;
+        const isAfterTraining = userCard.specialTrainingStatus === 'done' || defaultImage === 'after_training';
+        const starClass = isAfterTraining ? 'star after-training' : 'star normal';
+        const starsContainer = cardFrameElement.querySelector('.card-stars');
+        if (starsContainer) {
+            starsContainer.innerHTML = Array(rarity).fill(`<span class="${starClass}">★</span>`).join('');
+        }
+
+        // 5. 카드 레벨 갱신
+        const level = userCard.level || userCard.cardLevel;
+        if (level) {
+            const levelDiv = cardFrameElement.querySelector('.card-level');
+            if (levelDiv) levelDiv.innerText = `Lv.${level}`;
+        }
+
+    } catch (err) {
+        // CORS, 404, 네트워크 차단 시 기본 정적 카드 오버레이 상태 유지
+    }
+}
 // 단일 등수 커트라인 조회
 async function loadSingleRankTrend(eventId, rankNum) {
     const chartTitle = document.getElementById('chartTitle');

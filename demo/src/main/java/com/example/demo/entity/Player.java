@@ -8,7 +8,7 @@ import lombok.Setter;
 
 @Entity
 @Table(name="player")
-@Getter @Setter
+@Getter
 @NoArgsConstructor
 @AllArgsConstructor
 public class Player {

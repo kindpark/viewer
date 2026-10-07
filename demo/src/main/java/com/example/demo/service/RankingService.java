@@ -33,7 +33,7 @@ public class RankingService {
         if (snapshots.isEmpty()) {
             return List.of();
         }
-
+        /*
         // 스냅샷의 userId 리스트 추출 후 Player 1회 Batch 조회 (N+1 방지)
         List<Long> userIds = snapshots.stream()
                 .map(EventRankingSnapshot::getUserId)
@@ -42,10 +42,9 @@ public class RankingService {
 
         Map<Long, Player> playerMap = playerRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(Player::getUserId, Function.identity(), (p1, p2) -> p1));
-
+        */
         return snapshots.stream().map(s -> {
-            Player p = playerMap.get(s.getUserId());
-            String name = (p != null && p.getName() != null) ? p.getName() : "Unknown";
+            String name = (s.getUserName() != null && !s.getUserName().isBlank()) ? s.getUserName() : "Unknown";
             String iconUrl = getDefaultIconUrl();
             return new SnapshotDto(
                     s.getUserId(),

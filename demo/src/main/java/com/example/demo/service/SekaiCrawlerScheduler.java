@@ -7,6 +7,7 @@ import com.example.demo.entity.Player;
 import com.example.demo.repository.EventRankingSnapshotRepository;
 import com.example.demo.repository.EventRepository;
 import com.example.demo.repository.PlayerRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -33,13 +34,11 @@ public class SekaiCrawlerScheduler {
     private final EventRankingSnapshotRepository snapshotRepository;
     private final PlayerRepository playerRepository;
     private final EventRepository eventRepository;
-    private final ObjectMapper objectMapper = new ObjectMapper();
-    //cdn 주소에서 에셋명 추출용 정규식 패턴
-    private static final Pattern CARD_ASSET_PATTERN =
-            Pattern.compile("https://storage\\.sekai\\.best/sekai-jp-assets/thumbnail/chara/([a-zA-Z0-9_]+)\\.webp");
+
     // 10분마다 랭킹 및 유저 프로필 데이터 수집
     @Scheduled(fixedRate = 600000)
     @CacheEvict(value = "singleRankTrend", allEntries = true)
+    @Transactional
     public void collectRankingData() {
         log.info("=== 랭킹 데이터 수집 시작 ===");
         String rankingApiUrl = "https://api.sekai.best/event/live?region=jp";
@@ -75,28 +74,29 @@ public class SekaiCrawlerScheduler {
             targetRanks.addAll(List.of(500, 1000, 5000, 10000, 30000, 50000, 100000));
 
             List<EventRankingSnapshot> snapshotList = new ArrayList<>();
-
+            List<Player> playerList = new ArrayList<>();
             for (RankingResponseDto.RankingItem item : rankings) {
                 Integer rank = item.getRank();
                 if (targetRanks.contains(rank)) {
+                    String userName=item.getName();
                     Long userId = item.getUserId() != null ? item.getUserId() : (long) Math.abs(item.getName().hashCode());
 
                     snapshotList.add(new EventRankingSnapshot(
                             currentEventId,
                             userId,
+                            userName,
                             rank,
                             item.getScoreAsLong(),
                             now
                     ));
-                    Player player = playerRepository.findById(userId)
-                            .orElse(new Player(userId, item.getName(), null));
-                    player.setName(item.getName());
-                    playerRepository.save(player);
+                    playerList.add(new Player(userId, item.getName(), null));
                 }
             }
 
             if (!snapshotList.isEmpty()) {
+                playerRepository.saveAll(playerList);
                 snapshotRepository.saveAll(snapshotList);
+
             }
 
         } catch (Exception e) {
