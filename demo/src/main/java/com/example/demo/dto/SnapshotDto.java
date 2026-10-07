@@ -18,9 +18,4 @@ public class SnapshotDto {
     private LocalDateTime recordedAt;
     private String userIconUrl;
 
-    private Integer rarity;
-    private String attrType;
-    private Integer cardLevel;
-    private Boolean isAfterTraining;
-
 }
