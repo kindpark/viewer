@@ -2,25 +2,27 @@ let chartInstance = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     const loadBtn = document.getElementById('loadBtn');
-    loadBtn.addEventListener('click', loadLatestRankings);
+    if (loadBtn) {
+        loadBtn.addEventListener('click', loadLatestRankings);
+    }
 
     loadLatestRankings();
     loadCutoffTrend();
 });
 
 async function loadLatestRankings() {
-    const eventId = document.getElementById('eventIdInput').value;
+    const eventIdInput = document.getElementById('eventIdInput');
+    const eventId = eventIdInput ? eventIdInput.value : '';
     const tableBody = document.getElementById('rankingTableBody');
-    tableBody.innerHTML = '<tr><td colspan="3">데이터를 불러오는 중...</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="4">데이터를 불러오는 중...</td></tr>';
 
     try {
         const response = await fetch(`/api/events/${eventId}/latest`);
-        //if(!response.ok) throw new Error('리더보드 로드 실패');
         const data = await response.json();
 
         tableBody.innerHTML = '';
-        if (!Array.isArray(data) || data.length===0) {
-            tableBody.innerHTML = '<tr><td colspan="3">수집된 데이터가 없습니다.</td></tr>';
+        if (!Array.isArray(data) || data.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="4">수집된 데이터가 없습니다.</td></tr>';
             return;
         }
 
@@ -28,59 +30,77 @@ async function loadLatestRankings() {
             const tr = document.createElement('tr');
             tr.style.cursor = 'pointer';
 
-            const defaultCard = 'https://sekai.best/assets/rarity_star_afterTraining-CUlLhfpl.png';
-                const cardImgUrl = (item.userIconUrl && !item.userIconUrl.includes('null')) ? item.userIconUrl : defaultCard;
-            // 실제 sekai.best 사이트의 카드 프레임 SVG 구조 복원
-                const profileSvgHtml = `
-                    <div class="card-thumb-wrapper" style="position: relative; width: 50px; height: 50px; display: inline-block; vertical-align: middle;">
-                        <svg viewBox="0 0 156 156" style="width: 100%; height: 100%; border-radius: 8px; overflow: hidden;">
-                            <!-- 1. 배경 유저 카드 일러스트 -->
-                            <image href="${cardImgUrl}" x="0" y="0" width="156" height="156" preserveAspectRatio="xMidYMid slice"
-                                   onerror="this.setAttribute('href', '${defaultCard}');" />
+            //API 응답 구조(rankNum 또는 rank)에서 정확한 등수 값 안전하게 추출
+            const actualRank = item.rankNum !== undefined ? item.rankNum : item.rank;
 
-                            <!-- 2. 하단 블랙 오버레이 바 -->
-                            <rect x="0" y="119" width="156" height="35" fill="black" fill-opacity="0.6"></rect>
+            //DOM dataset 속성에 확실하게 주입
+            tr.setAttribute('data-rank', actualRank);
 
-                            <!-- 3. 카드 레어리티 테두리 프레임 -->
-                            <image href="https://sekai.best/assets/cardFrame_S_4-DkwuVAqt.png" x="0" y="0" width="156" height="156"></image>
+            const defaultCard = 'https://storage.sekai.best/sekai-jp-assets/thumbnail/chara/res001_no011_after_training.webp';
+            const cardImgUrl = item.userIconUrl || defaultCard;
+            // 2. 속성(Attribute) 아이콘 경로 (기본값: cool)
+                        const attrType = item.attrType || 'cool';
+                        const attrIconUrl = `https://storage.sekai.best/sekai-jp-assets/icon/attr/${attrType}.png`;
 
-                            <!-- 4. 속성 아이콘 (예: Cool) -->
-                            <image href="https://sekai.best/assets/icon_attribute_cool-Cm_EFAKA.png" x="2" y="2" width="32" height="32"></image>
+                        // 3. 레어리티 별(Star) HTML 생성 (각성 완료 시 보라색 별, 미각성 시 노란색 별)
+                        const rarity = item.rarity || 4;
+                        const isAfterTraining = item.isAfterTraining === true;
+                        const starClass = isAfterTraining ? 'star after-training' : 'star normal';
+                        const starsHtml = Array(rarity).fill(`<span class="${starClass}">★</span>`).join('');
 
-                            <!-- 5. 레어리티 별 아이콘 (4성 예시) -->
-                            <image href="https://sekai.best/assets/rarity_star_afterTraining-CUlLhfpl.png" x="6" y="122" width="24" height="24"></image>
-                            <image href="https://sekai.best/assets/rarity_star_afterTraining-CUlLhfpl.png" x="30" y="122" width="24" height="24"></image>
-                            <image href="https://sekai.best/assets/rarity_star_afterTraining-CUlLhfpl.png" x="54" y="122" width="24" height="24"></image>
-                            <image href="https://sekai.best/assets/rarity_star_afterTraining-CUlLhfpl.png" x="78" y="122" width="24" height="24"></image>
-                        </svg>
-                    </div>
-                `;
-            const defaultIcon = 'https://sekai.best/assets/rarity_star_afterTraining-CUlLhfpl.png';
-            const hasValidIcon = item.userIconUrl && item.userIconUrl.trim() !== '' && !item.userIconUrl.endsWith('null');
-            const iconSrc = item.userIconUrl || defaultIcon;
+                        // 4. 카드 레벨
+                        const cardLevel = item.cardLevel || 1;
+// 5. 오버레이 레이어가 합성된 innerHTML 구성
             tr.innerHTML = `
-                <td>${item.rankNum}</td>
-                <td>${profileSvgHtml}</td>
+                <td>${actualRank}</td>
+                <td>
+                    <div class="card-frame">
+                        <!-- Layer 1: 메인 썸네일 -->
+                        <img class="card-thumb"
+                             src="${cardImgUrl}"
+                             alt="card profile"
+                             referrerpolicy="no-referrer"
+                             onerror="this.onerror=null; this.src='${defaultCard}';" />
+
+                        <!-- Layer 2: 좌상단 속성 아이콘 -->
+                        <img class="card-attr"
+                             src="${attrIconUrl}"
+                             alt="${attrType}"
+                             onerror="this.style.display='none';" />
+
+                        <!-- Layer 3: 좌하단 레어리티 별 -->
+                        <div class="card-stars">${starsHtml}</div>
+
+                        <!-- Layer 4: 우하단 카드 레벨 -->
+                        <div class="card-level">Lv.${cardLevel}</div>
+                    </div>
+                </td>
                 <td>${escapeHtml(item.playerName)}</td>
-                <td>${item.score ? item.score.toLocaleString() : 0}</td>
+                <td>${item.score ? Number(item.score).toLocaleString() : 0}</td>
             `;
-            tr.addEventListener('click', ()=>{
-            loadSingleRankTrend(eventId, item.rankNum);
-            })
+
+            // [수정 3] 클릭 시 e.currentTarget.getAttribute('data-rank')로 확실하게 가져옴
+            tr.addEventListener('click', (e) => {
+                const targetTr = e.currentTarget;
+                const clickedRank = targetTr.getAttribute('data-rank');
+
+                if (clickedRank && clickedRank !== 'undefined') {
+                    loadSingleRankTrend(eventId, clickedRank);
+                }
+            });
+
             tableBody.appendChild(tr);
         });
     } catch (err) {
-        console.error(err);
-        tableBody.innerHTML = '<tr><td colspan="3">데이터 로딩 실패</td></tr>';
+        console.error("리더보드 로딩 실패", err);
+        tableBody.innerHTML = '<tr><td colspan="4">데이터 로딩 실패</td></tr>';
     }
 }
-//단일 등수 커트라인 조회
+
+// 단일 등수 커트라인 조회
 async function loadSingleRankTrend(eventId, rankNum) {
     const chartTitle = document.getElementById('chartTitle');
-    chartTitle.innerText = `이벤트 ${eventId} - ${rankNum}위 컷트라인 점수 추이`;
-
     try {
-        // 단 1개의 등수만 백엔드로 요청
         const response = await fetch(`/api/events/${eventId}/cutoffs?ranks=${rankNum}`);
         if (!response.ok) throw new Error(`컷트라인 에러: ${response.status}`);
 
@@ -88,21 +108,28 @@ async function loadSingleRankTrend(eventId, rankNum) {
         const trendData = result.trendData;
 
         if (!Array.isArray(trendData) || trendData.length === 0) {
-            if (chartInstance) chartInstance.destroy();
+            destroyChart();
             return;
         }
 
         const labels = trendData.map(item =>
             new Date(item.timestamp).toLocaleTimeString([], { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
         );
+        const latestPoint = trendData[trendData.length - 1];
+        const latestScore = latestPoint.rankScores ? (latestPoint.rankScores[rankNum] ?? latestPoint.rankScores[String(rankNum)]) : null;
+        const latestTimeStr = new Date(latestPoint.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        if (chartTitle) chartTitle.innerText = `이벤트 ${eventId} - ${rankNum}위 컷트라인 점수 추이`;
 
-        // 단일 선 데이터셋 생성
         const datasets = [{
             label: `${rankNum}위 컷 점수`,
-            data: trendData.map(point => point.rankScores[rankNum] || null),
+            data: trendData.map(point => {
+                if (!point.rankScores) return null;
+                return point.rankScores[rankNum] ?? point.rankScores[String(rankNum)] ?? null;
+            }),
             borderColor: 'rgb(75, 192, 192)',
             backgroundColor: 'rgba(75, 192, 192, 0.2)',
             tension: 0.2,
+            spanGaps: true,
             fill: true
         }];
 
@@ -110,72 +137,84 @@ async function loadSingleRankTrend(eventId, rankNum) {
 
     } catch (err) {
         console.error("단일 컷트라인 로딩 에러", err);
+        destroyChart();
     }
 }
-//주요 등수 커트라인 조회
-async function loadCutoffTrend() {
-    const eventId = document.getElementById('eventIdInput').value;
-    const chartTitle = document.getElementById('chartTitle');
-    chartTitle.innerText = `이벤트 ${eventId} 주요 등수 컷트라인 점수 추이`;
 
-    // 조회할 컷트라인 등수 설정
+// 주요 등수 커트라인 조회
+async function loadCutoffTrend() {
+    const eventIdInput = document.getElementById('eventIdInput');
+    const eventId = eventIdInput ? eventIdInput.value : '';
+    const chartTitle = document.getElementById('chartTitle');
+    if (chartTitle) chartTitle.innerText = `이벤트 ${eventId} 주요 등수 컷트라인 점수 추이`;
+
     const targetRanks = "100,500,1000,5000,10000,30000,50000,100000";
 
     try {
         const response = await fetch(`/api/events/${eventId}/cutoffs?ranks=${targetRanks}`);
         if (!response.ok) throw new Error(`컷트라인 에러: ${response.status}`);
 
-        const result = await response.json(); // { eventId: 219, trendData: [...] }
+        const result = await response.json();
         const trendData = result.trendData;
 
         if (!Array.isArray(trendData) || trendData.length === 0) {
-            if (chartInstance) chartInstance.destroy();
+            destroyChart();
             return;
         }
 
-        // X축 시간 라벨 생성
         const labels = trendData.map(item =>
             new Date(item.timestamp).toLocaleTimeString([], { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
         );
 
-        // API에서 지정한 등수 목록 가져오기 (예: [100, 500, 1000, 5000, 10000])
         const ranksList = targetRanks.split(',').map(Number);
-
-        // 등수별 선 색상지정
         const colors = [
-            'rgb(255, 99, 132)',  // 100위 (빨강)
-            'rgb(54, 162, 235)',  // 500위 (파랑)
-            'rgb(255, 206, 86)',  // 1000위 (노랑)
-            'rgb(75, 192, 192)',  // 5000위 (청록)
-            'rgb(153, 102, 255)'  // 10000위 (보라)
+            'rgb(255, 99, 132)',
+            'rgb(54, 162, 235)',
+            'rgb(255, 206, 86)',
+            'rgb(75, 192, 192)',
+            'rgb(153, 102, 255)',
+            'rgb(255, 159, 64)',
+            'rgb(75, 207, 250)',
+            'rgb(201, 203, 207)'
         ];
 
-        // Chart.js용 datasets 구성
-        const datasets = ranksList.map((rank, index) => {
-            return {
-                label: `${rank}위 컷`,
-                data: trendData.map(point => point.rankScores[rank] || null),
-                borderColor: colors[index % colors.length],
-                backgroundColor: colors[index % colors.length],
-                tension: 0.2,
-                fill: false
-            };
-        });
+        const datasets = ranksList.map((rank, index) => ({
+            label: `${rank}위 컷`,
+            data: trendData.map(point => {
+                if (!point.rankScores) return null;
+                return point.rankScores[rank] ?? point.rankScores[String(rank)] ?? null;
+            }),
+            borderColor: colors[index % colors.length],
+            backgroundColor: colors[index % colors.length],
+            tension: 0.2,
+            spanGaps: true,
+            fill: false
+        }));
 
         renderChart(labels, datasets);
 
     } catch (err) {
         console.error("컷트라인 로딩 에러", err);
+        destroyChart();
     }
 }
 
-// 3. Chart.js 랜더링 (점수 추이용)
-function renderChart(labels, datasets) {
-    const ctx = document.getElementById('trendChart').getContext('2d');
-
+// 차트 객체 파괴 함수
+function destroyChart() {
     if (chartInstance) {
         chartInstance.destroy();
+        chartInstance = null;
     }
+}
+
+// Chart.js 렌더링
+function renderChart(labels, datasets) {
+    const canvas = document.getElementById('trendChart');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+
+    destroyChart();
 
     chartInstance = new Chart(ctx, {
         type: 'line',
@@ -192,11 +231,11 @@ function renderChart(labels, datasets) {
             },
             scales: {
                 y: {
-                    reverse: false, // 점수 그래프이므로 높을수록 위로 감!
+                    reverse: false,
                     title: { display: true, text: '이벤트 점수 (Event Pt)' },
                     ticks: {
                         callback: function(value) {
-                            return value.toLocaleString(); // 숫자에 쉼표 표시
+                            return Number(value).toLocaleString();
                         }
                     }
                 },
@@ -207,6 +246,7 @@ function renderChart(labels, datasets) {
         }
     });
 }
+
 function escapeHtml(text) {
     if (!text) return '';
     return text.replace(/&/g, "&amp;")

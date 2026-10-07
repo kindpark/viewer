@@ -2,11 +2,13 @@ package com.example.demo.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
 
 @Getter @Setter
+@NoArgsConstructor
 @AllArgsConstructor
 public class SnapshotDto {
     private Long userId;
@@ -15,4 +17,10 @@ public class SnapshotDto {
     private Long score;
     private LocalDateTime recordedAt;
     private String userIconUrl;
+
+    private Integer rarity;
+    private String attrType;
+    private Integer cardLevel;
+    private Boolean isAfterTraining;
+
 }

@@ -11,7 +11,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/events")
@@ -28,22 +30,22 @@ public class RankingController {
     @GetMapping("/{eventId}/cutoffs")
     public CutoffTrendResponseDto getCutoffTrends(
             @PathVariable Integer eventId,
-            @RequestParam(defaultValue = "100,500,1000,5000,10000") List<Integer> ranks) {
+            @RequestParam(value="ranks") List<String> ranksParam) {
+
+        List<Integer> ranks = ranksParam.stream()
+                .flatMap(r -> Arrays.stream(r.split(",")))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(Integer::parseInt)
+                .distinct()
+                .collect(Collectors.toList());
+
         return service.getCutoffTrends(eventId, ranks);
     }
-    //테스트
-    @PostMapping("/test/init")
-    public String initTestData() {
-        playerRepository.save(new Player(1001L, "유저A", "{}"));
-        playerRepository.save(new Player(1002L, "유저B", "{}"));
-
-        LocalDateTime now = LocalDateTime.now();
-        snapshotRepository.save(new EventRankingSnapshot(1, 1001L, 1, 500000L, now.minusMinutes(10)));
-        snapshotRepository.save(new EventRankingSnapshot(1, 1002L, 2, 450000L, now.minusMinutes(10)));
-
-        snapshotRepository.save(new EventRankingSnapshot(1, 1001L, 1, 550000L, now));
-        snapshotRepository.save(new EventRankingSnapshot(1, 1002L, 2, 480000L, now));
-
-        return "OK";
+    @GetMapping("/test/player/{userId}")
+    public String getRawPlayerData(@PathVariable Long userId) {
+        return playerRepository.findById(userId)
+                .map(Player::getRowJson)
+                .orElse("해당 유저 데이터가 DB에 없습니다.");
     }
 }
