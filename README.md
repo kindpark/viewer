@@ -8,7 +8,8 @@
 
 구조도
 
-!image.png
+<img width="762" height="694" alt="image" src="https://github.com/user-attachments/assets/e4345591-488a-4944-9786-5a124ade5aaa" />
+
 
 sekai-master-db-diff와 api.sekai.best에서 데이터를 가져온다.
 
