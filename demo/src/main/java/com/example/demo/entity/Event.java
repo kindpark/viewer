@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.time.LocalDateTime;
 
@@ -23,5 +22,10 @@ public class Event {
     public Event(Integer eventId) {
         this.eventId = eventId;
         this.name = "Event " + eventId;
+    }
+    public void updateInfo(String name, LocalDateTime startAt, LocalDateTime aggregateAt) {
+        this.name = name;
+        this.startAt = startAt;
+        this.aggregateAt = aggregateAt;
     }
 }

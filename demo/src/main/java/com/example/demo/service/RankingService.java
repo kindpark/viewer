@@ -1,12 +1,13 @@
-package com.example.demo.service;
+package com.example.demo.service; // 기존 파일의 package 줄에 맞추세요
 
 import com.example.demo.dto.CutoffTrendResponseDto;
 import com.example.demo.dto.SnapshotDto;
+import com.example.demo.entity.CardMaster;
+import com.example.demo.entity.Event;
 import com.example.demo.entity.EventRankingSnapshot;
-import com.example.demo.entity.Player;
+import com.example.demo.repository.CardMasterRepository;
 import com.example.demo.repository.EventRankingSnapshotRepository;
-import com.example.demo.repository.PlayerRepository;
-
+import com.example.demo.repository.EventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
@@ -15,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,41 +23,89 @@ import java.util.stream.Collectors;
 @Slf4j
 public class RankingService {
 
-    private final EventRankingSnapshotRepository snapshotRepository;
-    private final PlayerRepository playerRepository;
+    // 기본 대체 썸네일 (CDN 직접 사용)
+    private static final String DEFAULT_ICON_URL =
+            "https://storage.sekai.best/sekai-jp-assets/thumbnail/chara/res001_no001_normal.webp";
 
-    // 최신 리더보드 조회 (유저 카드 이미지 URL 매핑)
+    private final EventRankingSnapshotRepository snapshotRepository;
+    private final CardMasterRepository cardMasterRepository;
+    private final EventRepository eventRepository;
+
+    /** 최신 리더보드: 스냅샷에 저장된 cardId로 카드 마스터를 매핑 */
+    @Transactional(readOnly = true)
     public List<SnapshotDto> getLatestRanking(Integer eventId) {
         List<EventRankingSnapshot> snapshots = snapshotRepository.findLatestRankingByEventId(eventId);
-
         if (snapshots.isEmpty()) {
             return List.of();
         }
-        /*
-        // 스냅샷의 userId 리스트 추출 후 Player 1회 Batch 조회 (N+1 방지)
-        List<Long> userIds = snapshots.stream()
-                .map(EventRankingSnapshot::getUserId)
-                .distinct()
-                .collect(Collectors.toList());
 
-        Map<Long, Player> playerMap = playerRepository.findAllById(userIds).stream()
-                .collect(Collectors.toMap(Player::getUserId, Function.identity(), (p1, p2) -> p1));
-        */
+        Set<Long> cardIds = snapshots.stream()
+                .map(EventRankingSnapshot::getCardId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<Long, CardMaster> cardMap = cardMasterRepository.findAllById(cardIds).stream()
+                .collect(Collectors.toMap(CardMaster::getId, c -> c, (a, b) -> a));
+
+        log.debug("리더보드 조회 event={} 카드 {}종 / 마스터 매핑 {}종", eventId, cardIds.size(), cardMap.size());
+
         return snapshots.stream().map(s -> {
             String name = (s.getUserName() != null && !s.getUserName().isBlank()) ? s.getUserName() : "Unknown";
-            String iconUrl = getDefaultIconUrl();
+            String iconUrl = DEFAULT_ICON_URL;
+            String attrType = null;
+            Integer rarity = null;
+            boolean afterTraining = false;
+
+            CardMaster card = s.getCardId() != null ? cardMap.get(s.getCardId()) : null;
+            if (card != null) {
+                rarity = card.getRarity();
+                attrType = card.getAttrType();
+                // 3성 미만 카드는 특훈 후 이미지가 없으므로 normal로 대체
+                boolean canAfter = rarity == null || rarity >= 3;
+                afterTraining = Boolean.TRUE.equals(s.getAfterTraining()) && canAfter;
+                iconUrl = afterTraining ? card.getAfterTrainingImageUrl() : card.getNormalImageUrl();
+            } else if (s.getCardId() != null) {
+                log.warn("카드 마스터에 없는 cardId={} (user {})", s.getCardId(), s.getUserId());
+            }
+
             return new SnapshotDto(
                     s.getUserId(),
                     name,
                     s.getRankNum(),
                     s.getScore(),
                     s.getRecordedAt(),
-                    iconUrl
+                    iconUrl,
+                    attrType,
+                    rarity,
+                    afterTraining,
+                    s.getCardLevel()
             );
         }).collect(Collectors.toList());
     }
 
-    // 시간별 주요 컷트라인 추이 조회 (캐싱 적용)
+    /** 데이터가 수집된 이벤트 목록 (최신순) - 드롭다운용 */
+    @Transactional(readOnly = true)
+    public List<Event> getEventsWithData() {
+        List<Integer> ids = snapshotRepository.findCollectedEventIds();
+        if (ids.isEmpty()) return List.of();
+        return eventRepository.findAllById(ids).stream()
+                .sorted(Comparator.comparing(Event::getEventId, Comparator.reverseOrder()))
+                .collect(Collectors.toList());
+    }
+
+    /** 현재 진행 중인 이벤트, 없으면 데이터가 있는 가장 최근 이벤트 */
+    @Transactional(readOnly = true)
+    public Optional<Event> getCurrentEvent() {
+        LocalDateTime now = LocalDateTime.now();
+        List<Event> withData = getEventsWithData();
+        return withData.stream()
+                .filter(e -> e.getStartAt() != null && e.getAggregateAt() != null
+                        && !now.isBefore(e.getStartAt()) && !now.isAfter(e.getAggregateAt()))
+                .findFirst()
+                .or(() -> withData.stream().findFirst());
+    }
+
+    /** 시간별 주요 컷트라인 추이 조회 (캐싱 적용) */
     @Cacheable(value = "singleRankTrend", key = "#eventId + '_' + #targetRanks.toString()")
     @Transactional(readOnly = true)
     public CutoffTrendResponseDto getCutoffTrends(Integer eventId, List<Integer> targetRanks) {
@@ -72,7 +120,6 @@ public class RankingService {
             return new CutoffTrendResponseDto(eventId, Collections.emptyList());
         }
 
-        // 수집 시각(recordedAt) 기준 그룹핑
         Map<LocalDateTime, Map<Integer, Long>> groupedByTime = snapshots.stream()
                 .collect(Collectors.groupingBy(
                         EventRankingSnapshot::getRecordedAt,
@@ -95,12 +142,7 @@ public class RankingService {
         return new CutoffTrendResponseDto(eventId, trendData);
     }
 
-    // 기본 대체 썸네일 (res001_no001)
-    private String getDefaultIconUrl() {
-        return "https://storage.sekai.best/sekai-jp-assets/thumbnail/chara/res001_no001_normal.webp";
-    }
-
-    // 15개 균등 샘플링
+    /** 균등 샘플링 (처음과 마지막 시점은 항상 포함) */
     private List<LocalDateTime> sampleTimes(List<LocalDateTime> times, int maxPoints) {
         if (times.size() <= maxPoints) return times;
 
@@ -115,7 +157,6 @@ public class RankingService {
 
         LocalDateTime latestTime = times.get(total - 1);
         if (!sampled.contains(latestTime)) {
-            sampled.remove(sampled.size() - 1);
             sampled.add(latestTime);
         }
         return sampled;

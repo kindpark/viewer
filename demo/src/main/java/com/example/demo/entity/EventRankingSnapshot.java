@@ -1,10 +1,8 @@
 package com.example.demo.entity;
 
-
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.time.LocalDateTime;
 
@@ -25,12 +23,23 @@ public class EventRankingSnapshot {
     private Integer rankNum;
     private Long score;
     private LocalDateTime recordedAt;
-    public EventRankingSnapshot(Integer eventId, Long userId, String userName, Integer rankNum, Long score, LocalDateTime recordedAt) {
+
+    // ★ 수집 시점의 리더 카드 정보 (이벤트별 기록 보존용, 기존 행은 null)
+    private Long cardId;
+    private Integer cardLevel;
+    private Boolean afterTraining;
+
+    public EventRankingSnapshot(Integer eventId, Long userId, String userName, Integer rankNum,
+                                Long score, LocalDateTime recordedAt,
+                                Long cardId, Integer cardLevel, Boolean afterTraining) {
         this.eventId = eventId;
         this.userId = userId;
         this.userName = userName;
         this.rankNum = rankNum;
         this.score = score;
         this.recordedAt = recordedAt;
+        this.cardId = cardId;
+        this.cardLevel = cardLevel;
+        this.afterTraining = afterTraining;
     }
 }

@@ -7,7 +7,7 @@ import lombok.Setter;
 
 import java.time.LocalDateTime;
 
-@Getter @Setter
+@Getter
 @NoArgsConstructor
 @AllArgsConstructor
 public class SnapshotDto {
@@ -17,5 +17,8 @@ public class SnapshotDto {
     private Long score;
     private LocalDateTime recordedAt;
     private String userIconUrl;
-
+    private String attrType;
+    private Integer rarity;
+    private Boolean isAfterTraining;
+    private Integer cardLevel;
 }

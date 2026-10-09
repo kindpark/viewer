@@ -1,4 +1,3 @@
-/*
 package com.example.demo.repository;
 
 import com.example.demo.entity.EventRankingSnapshot;
@@ -6,41 +5,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.util.List;
-
-public interface EventRankingSnapshotRepository extends JpaRepository<EventRankingSnapshot, Long> {
-    List<EventRankingSnapshot> findByEventIdAndUserIdOrderByRecordedAtAsc(Integer eventId, Long userId);
-    // ★ 1번 수정: Player 엔티티를 LEFT JOIN FETCH로 한 번에 함께 조회하도록 변경
-    @Query("SELECT s FROM EventRankingSnapshot s " +
-            "LEFT JOIN FETCH Player p ON s.userId = p.userId " +
-            "WHERE s.eventId = :eventId AND s.recordedAt = " +
-            "(SELECT MAX(s2.recordedAt) FROM EventRankingSnapshot s2 WHERE s2.eventId = :eventId) " +
-            "ORDER BY s.rankNum ASC")
-    List<EventRankingSnapshot> findLatestRankingByEventId(@Param("eventId") Integer eventId);
-
-    //특정 이벤트의 주요 컷트라인 등수들(100위, 1000위 등)의 시간별 점수 추이 조회 (차트용)
-    @Query("SELECT s FROM EventRankingSnapshot s " +
-            "WHERE s.eventId = :eventId AND s.rankNum IN :ranks " +
-            "ORDER BY s.recordedAt ASC, s.rankNum ASC")
-    List<EventRankingSnapshot> findCutoffTrendsByEventIdAndRanks(
-            @Param("eventId") Integer eventId,
-            @Param("ranks") List<Integer> ranks);
-}
-*/
-package com.example.demo.repository;
-
-import com.example.demo.entity.EventRankingSnapshot;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface EventRankingSnapshotRepository extends JpaRepository<EventRankingSnapshot, Long> {
 
     List<EventRankingSnapshot> findByEventIdAndUserIdOrderByRecordedAtAsc(Integer eventId, Long userId);
 
-    // Player 조인 제거: 최신 스냅샷만 단일 테이블에서 빠르게 조회
+    // 최신 스냅샷만 단일 테이블에서 조회
     @Query("SELECT s FROM EventRankingSnapshot s " +
             "WHERE s.eventId = :eventId AND s.recordedAt = " +
             "(SELECT MAX(s2.recordedAt) FROM EventRankingSnapshot s2 WHERE s2.eventId = :eventId) " +
@@ -54,4 +26,11 @@ public interface EventRankingSnapshotRepository extends JpaRepository<EventRanki
     List<EventRankingSnapshot> findCutoffTrendsByEventIdAndRanks(
             @Param("eventId") Integer eventId,
             @Param("ranks") List<Integer> ranks);
+
+    // 데이터가 실제로 수집된 이벤트 번호 목록 (드롭다운용)
+    @Query("SELECT DISTINCT s.eventId FROM EventRankingSnapshot s")
+    List<Integer> findCollectedEventIds();
+    boolean existsByEventIdAndRecordedAt(Integer eventId, LocalDateTime recordedAt);
+    // 이벤트 종료 후 최종 스냅샷이 저장됐는지 확인 (수집 중단 판단용)
+    boolean existsByEventIdAndRecordedAtGreaterThanEqual(Integer eventId, LocalDateTime recordedAt);
 }

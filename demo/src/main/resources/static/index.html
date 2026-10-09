@@ -11,9 +11,12 @@
 <div class="container">
     <header>
         <h1>Sekai.best 이벤트 랭킹 & 컷트라인 추이</h1>
-        <label for="eventIdInput">이벤트 ID: </label>
-        <input type="number" id="eventIdInput" value="219">
-        <button id="loadBtn">조회</button>
+        <div class="event-selector">
+            <label for="eventSelect">이벤트 선택: </label>
+            <select id="eventSelect">
+                <option value="">이벤트 목록 불러오는 중...</option>
+            </select>
+        </div>
     </header>
 
     <div class="grid">
@@ -30,7 +33,9 @@
                 </tr>
                 </thead>
                 <tbody id="rankingTableBody">
-                <tr><td colspan="4">데이터를 불러오는 중...</td></tr>
+                <tr>
+                    <td colspan="4">이벤트를 선택해 주세요.</td>
+                </tr>
                 </tbody>
             </table>
         </div>
