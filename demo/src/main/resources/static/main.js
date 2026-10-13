@@ -1,5 +1,5 @@
 const DEFAULT_CARD = 'https://storage.sekai.best/sekai-jp-assets/thumbnail/chara/res001_no001_normal.webp';
-const MAIN_RANKS = '100,500,1000,5000,10000,30000,50000,100000';
+const MAIN_RANKS = '10, 20, 30, 50, 100, 200, 300, 500,1000,2000, 3000,5000,10000,30000,50000,100000';
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5분마다 자동 갱신
 
 let chartInstance = null;

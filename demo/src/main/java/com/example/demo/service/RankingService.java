@@ -11,6 +11,7 @@ import com.example.demo.repository.EventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cglib.core.Local;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,8 +32,10 @@ public class RankingService {
     private final CardMasterRepository cardMasterRepository;
     private final EventRepository eventRepository;
 
-    /** 최신 리더보드: 스냅샷에 저장된 cardId로 카드 마스터를 매핑 */
-    @Transactional(readOnly = true)
+    // 최신 리더보드: 스냅샷에 저장된 cardId로 카드 마스터를 매핑
+    //캐시 히트일때도 DB 커넥션이 열릴수 있어서, 캐시랑 부딪힐수 있는 트렌젝션 삭제하고 캐시 추가
+
+    @Cacheable(value="lastestRanking", key="#eventId", sync=true)
     public List<SnapshotDto> getLatestRanking(Integer eventId) {
         List<EventRankingSnapshot> snapshots = snapshotRepository.findLatestRankingByEventId(eventId);
         if (snapshots.isEmpty()) {
@@ -105,22 +108,21 @@ public class RankingService {
                 .or(() -> withData.stream().findFirst());
     }
 
-    /** 시간별 주요 컷트라인 추이 조회 (캐싱 적용) */
-    @Cacheable(value = "singleRankTrend", key = "#eventId + '_' + #targetRanks.toString()")
-    @Transactional(readOnly = true)
+    @Cacheable(value = "singleRankTrend",
+            key = "#eventId + '_' + #targetRanks.toString()",
+            sync = true)
     public CutoffTrendResponseDto getCutoffTrends(Integer eventId, List<Integer> targetRanks) {
         if (targetRanks == null || targetRanks.isEmpty()) {
             return new CutoffTrendResponseDto(eventId, Collections.emptyList());
         }
-
+/*
         List<EventRankingSnapshot> snapshots =
                 snapshotRepository.findCutoffTrendsByEventIdAndRanks(eventId, targetRanks);
 
         if (snapshots.isEmpty()) {
             return new CutoffTrendResponseDto(eventId, Collections.emptyList());
         }
-
-        Map<LocalDateTime, Map<Integer, Long>> groupedByTime = snapshots.stream()
+                Map<LocalDateTime, Map<Integer, Long>> groupedByTime = snapshots.stream()
                 .collect(Collectors.groupingBy(
                         EventRankingSnapshot::getRecordedAt,
                         TreeMap::new,
@@ -140,9 +142,34 @@ public class RankingService {
                 .collect(Collectors.toList());
 
         return new CutoffTrendResponseDto(eventId, trendData);
+*/
+        //시점 목록만 조회한다. 일단 15개로 샘플링
+        List<LocalDateTime> allTimes = snapshotRepository.findDistinctRecordedAtByEventId(eventId);
+        if(allTimes.isEmpty()){
+            return new CutoffTrendResponseDto(eventId, Collections.emptyList());
+        }
+        List<LocalDateTime> sampledTimes = sampleTimes(allTimes, 15);
+
+        //요청 등수 조회(전에 쓴 메소드 대비 행이 1/100수준으로 절약됨
+        List<EventRankingSnapshot> snapshots = snapshotRepository.findByEventIdAndRankNumInAndRecordedAtIn(eventId, targetRanks, sampledTimes);
+
+        Map<LocalDateTime, Map<Integer, Long>> groupedByTime = snapshots.stream()
+                .collect(Collectors.groupingBy(
+                        EventRankingSnapshot::getRecordedAt,
+                        TreeMap::new,
+                        Collectors.toMap(
+                                EventRankingSnapshot::getRankNum,
+                                EventRankingSnapshot::getScore,
+                                (existing, replacement) -> existing
+                        )
+                ));
+        List<CutoffTrendResponseDto.RankTrendPoint> trendData = sampledTimes.stream()
+                .map(time->new CutoffTrendResponseDto.RankTrendPoint(
+                        time, groupedByTime.getOrDefault(time, Map.of())
+                )).collect(Collectors.toList());
+        return new CutoffTrendResponseDto(eventId, trendData);
     }
 
-    /** 균등 샘플링 (처음과 마지막 시점은 항상 포함) */
     private List<LocalDateTime> sampleTimes(List<LocalDateTime> times, int maxPoints) {
         if (times.size() <= maxPoints) return times;
 

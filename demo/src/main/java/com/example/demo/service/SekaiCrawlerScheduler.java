@@ -15,12 +15,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.*;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Instant;
@@ -40,7 +44,7 @@ public class SekaiCrawlerScheduler {
     private final EventRepository eventRepository;
     private final CardMasterRepository cardMasterRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
-
+    private final CacheManager cacheManager;
     private static final String EVENTS_JSON_URL =
             "https://raw.githubusercontent.com/Sekai-World/sekai-master-db-diff/main/events.json";
     private static final String CARDS_JSON_URL =
@@ -49,10 +53,9 @@ public class SekaiCrawlerScheduler {
             "https://storage.sekai.best/sekai-jp-assets/thumbnail/chara/";
     private static final String RANKING_API_URL = "https://api.sekai.best/event/live?region=jp";
 
-    // 이벤트 종료(aggregateAt) 후 이 시간이 지난 시점의 스냅샷을 최종본으로 보고 수집을 멈춤
+    //이벤트 종료(aggregateAt) 후 이 시간이 지난 시점의 스냅샷을 최종본으로 보고 수집을 멈춤
     private static final int FINAL_SNAPSHOT_DELAY_MINUTES = 30;
 
-    /** 서버 시작 시 마스터 데이터 → 랭킹 순서로 동기화 */
     @EventListener(ApplicationReadyEvent.class)
     public void initDataOnStartup() {
         log.info("=== 애플리케이션 가동: 마스터 데이터 및 랭킹 초기 동기화 시작 ===");
@@ -123,7 +126,6 @@ public class SekaiCrawlerScheduler {
 
     /** 10분마다 랭킹 수집 */
     @Scheduled(fixedRate = 600000, initialDelay=600000)
-    @CacheEvict(value = "singleRankTrend", allEntries = true)
     @Transactional
     public void collectRankingData() {
         log.info("=== 랭킹 데이터 수집 시작 ===");
@@ -167,8 +169,9 @@ public class SekaiCrawlerScheduler {
             }
 
             Set<Integer> targetRanks = new HashSet<>();
-            for (int i = 1; i <= 100; i++) targetRanks.add(i);
-            targetRanks.addAll(List.of(500, 1000, 5000, 10000, 30000, 50000, 100000));
+            for (int i = 1; i <= 10; i++) targetRanks.add(i);
+            targetRanks.addAll(List.of(20, 30, 50, 100, 200, 300,
+                    500, 1000, 2000, 3000, 5000, 10000, 30000, 50000, 100000));
 
             List<EventRankingSnapshot> snapshotList = new ArrayList<>();
             Map<Long, Player> playerMap = new HashMap<>();
@@ -208,6 +211,7 @@ public class SekaiCrawlerScheduler {
             if (!snapshotList.isEmpty()) {
                 playerRepository.saveAll(playerMap.values());
                 snapshotRepository.saveAll(snapshotList);
+                evictRankingCachesAfterCommit();
                 log.info("랭킹 수집 완료: event {} / {}건 스냅샷, {}명 유저", currentEventId,
                         snapshotList.size(), playerMap.size());
             }
@@ -220,4 +224,26 @@ public class SekaiCrawlerScheduler {
     private LocalDateTime toLocal(long epochMillis) {
         return LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), ZoneId.systemDefault());
     }
+    //DB에 저장된 데이터를 비운다.
+    private void evictRankingCachesAfterCommit() {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    evictRankingCaches();
+                }
+            });
+        } else {
+            // 서버 시작 시 호출처럼 트랜잭션 밖에서 실행된 경우
+            evictRankingCaches();
+        }
+    }
+
+    private void evictRankingCaches() {
+        for (String name : List.of("latestRanking", "singleRankTrend")) {
+            Cache cache = cacheManager.getCache(name);
+            if (cache != null) cache.clear();
+        }
+    }
+
 }
