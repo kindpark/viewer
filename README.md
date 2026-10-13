@@ -6,6 +6,26 @@
 
 이번에는 이를 보완하고자 하나 만들어봤다.
 
+기능
+
+<img width="925" height="666" alt="image" src="https://github.com/user-attachments/assets/3fdfc45e-0c72-4901-8e56-5d6d4212e46a" />
+
+
+<img width="914" height="655" alt="image" src="https://github.com/user-attachments/assets/b73f0e62-bf2d-43e7-b208-bb988657fb6a" />
+
+
+위 사진 처럼 주요 등수 커트라인을 조회할 수 있고, 아래 사진처럼 유저를 클릭하면 점수 추이를 관찰할수 있다. 갱신은 10분마다 되며, 주요 지점만 남겨두어 주요 지점의 점수를 관찰할수 있다.
+
+<img width="918" height="662" alt="image" src="https://github.com/user-attachments/assets/9f3d29b6-60b3-4019-a704-927c48283417" />
+
+
+프로그램을 만든 시점 이후 지난 시점의 랭킹도 위와같이 조회해볼수 있다. 
+
+<img width="455" height="553" alt="image" src="https://github.com/user-attachments/assets/f7cd6354-0075-496a-9dc7-9134b7ee5702" />
+
+
+위의 등수 칸을 클릭하여 주요 등수 몇곳을 가려볼 수도 있다..
+
 구조도
 
 <img width="762" height="694" alt="image" src="https://github.com/user-attachments/assets/e4345591-488a-4944-9786-5a124ade5aaa" />
@@ -39,3 +59,7 @@ DB는
 
 - 외부 API 호출은 이용자 수와 상관없이 서버가 10분마다 한 번만 합니다. 접속자가 늘어도 sekai.best에 가는 요청은 늘지 않습니다.
 - 카드 이미지는 서버가 아니라 CDN에서 바로 받으므로 서버가 이미지를 전송하지 않습니다.
+
+### 한계점
+
+- **서버가 꺼져 있던 동안 이벤트가 끝난 경우**: 라이브 API가 이미 다음 이벤트를 내려주기 때문에 지난 이벤트의 최종 스냅샷은 저장되지 않는다. 그 이벤트는 마지막으로 수집된 시점까지만 남는다.
