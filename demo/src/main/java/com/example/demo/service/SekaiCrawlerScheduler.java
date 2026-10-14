@@ -59,8 +59,10 @@ public class SekaiCrawlerScheduler {
     @EventListener(ApplicationReadyEvent.class)
     public void initDataOnStartup() {
         log.info("=== 애플리케이션 가동: 마스터 데이터 및 랭킹 초기 동기화 시작 ===");
-        syncMasterData();
-        collectRankingData();
+
+         //   syncEvents();
+        //    syncCards();
+         //   collectRankingData();
     }
 
     @Scheduled(cron = "0 0 4 * * *")
@@ -122,7 +124,7 @@ public class SekaiCrawlerScheduler {
         }
     }
     //10분마다 랭킹 수집함
-    @Scheduled(fixedRate = 600000, initialDelay=600000)
+    @Scheduled(fixedRate = 300000, initialDelay=600000)
     @Transactional
     public void collectRankingData() {
         log.info("=== 랭킹 데이터 수집 시작 ===");

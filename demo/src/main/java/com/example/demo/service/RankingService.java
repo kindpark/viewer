@@ -36,7 +36,7 @@ public class RankingService {
     //최신 리더보드: 스냅샷에 저장된 cardId로 카드 마스터를 매핑
     //캐시 히트일때도 DB 커넥션이 열릴수 있어서, 캐시랑 부딪힐수 있는 트렌젝션 삭제하고 캐시 추가
 
-    @Cacheable(value="lastestRanking", key="#eventId", sync=true)
+    @Cacheable(value="latestRanking", key="#eventId", sync=true)
     public List<SnapshotDto> getLatestRanking(Integer eventId) {
         List<EventRankingSnapshot> snapshots = snapshotRepository.findLatestRankingByEventId(eventId);
         if (snapshots.isEmpty()) {
@@ -153,11 +153,16 @@ public class RankingService {
 
         double step = (double) (total - 1) / (maxPoints - 1);
         for (int i = 1; i < maxPoints - 1; i++) {
-            sampled.add(times.get((int) Math.round(i * step)));
+            int index = (int) Math.round(i * step);
+            LocalDateTime sampledTime = times.get(index);
+            if (!sampled.contains(sampledTime)) {
+                sampled.add(sampledTime);
+            }
         }
 
+        // 가장 마지막(최신) 시점 반드시 강제 포함
         LocalDateTime latestTime = times.get(total - 1);
-        if (!sampled.contains(latestTime)) {
+        if (!sampled.get(sampled.size() - 1).equals(latestTime)) {
             sampled.add(latestTime);
         }
         return sampled;

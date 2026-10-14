@@ -32,12 +32,14 @@ header {
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    min-width:0;
 }
 .card.sticky-chart {
     position: -webkit-sticky; /* Safari 브라우저 지원 */
     position: sticky;
     top: 20px; /* 스크롤할 때 화면 상단에서 20px 여백 유지 */
     z-index: 10; /* 테이블 상단 레이어 보장 */
+    height:fit-content;
 }
 /* 1. 카드 프레임 전체 컨테이너 */
 .card-frame {
@@ -140,6 +142,20 @@ tr:hover {
     object-fit:cover;
     vertical-align:middle;
     border:1px solid #ddd;
+}
+/* 테이블 셀이 내부 콘텐츠 때문에 강제로 늘어나는 것을 방지 */
+tr.inline-chart-row td {
+    width: 100%;
+    max-width: 0; /* flex/grid/table 내부에서 자식 요소가 부모 넘침 방지 핵심 */
+    padding: 15px;
+    box-sizing: border-box;
+}
+
+/* 차트 컨테이너가 화면 크기에 맞춰 동적으로 반응하도록 설정 */
+.inline-chart-container {
+    position: relative;
+    width: 100%;
+    height: 260px;
 }
 /* ==========================================================
    📱 모바일 및 태블릿 전용 반응형 미디어 쿼리 레이아웃 고정

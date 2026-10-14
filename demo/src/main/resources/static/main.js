@@ -296,6 +296,11 @@ function escapeHtml(text) {
 /** 아코디언 인라인 차트 토글 함수 */
 async function toggleInlineRankTrend(clickedRow, eventId, rankNum) {
     const nextRow = clickedRow.nextElementSibling;
+    //기존에 등록된 window resize 있으면 제거함
+    if (window.inlineChartResizeHandler) {
+        window.removeEventListener('resize', window.inlineChartResizeHandler);
+        window.inlineChartResizeHandler = null;
+    }
 
     // 1. 이미 하단에 해당 랭킹의 차트 행이 열려있다면 삭제 후 종료 (다시 클릭해서 가리기)
     if (nextRow && nextRow.classList.contains('inline-chart-row')) {
@@ -368,6 +373,13 @@ async function toggleInlineRankTrend(clickedRow, eventId, rankNum) {
                 }
             }
         });
+        // 4. ✨ 창 크기가 변경될 때 차트 크기를 동적으로 같이 줄이고 늘리는 핸들러 등록
+        window.inlineChartResizeHandler = () => {
+            if (inlineChartInstance) {
+                inlineChartInstance.resize(); // 차트 크기 강제 재계산
+            }
+        };
+        window.addEventListener('resize', window.inlineChartResizeHandler);
 
     } catch (err) {
         console.error('인라인 컷트라인 로딩 에러', err);
