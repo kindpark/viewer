@@ -63,14 +63,12 @@ public class SekaiCrawlerScheduler {
         collectRankingData();
     }
 
-    /** 매일 새벽 4시 마스터 데이터 동기화 */
     @Scheduled(cron = "0 0 4 * * *")
     public void syncMasterData() {
         syncEvents();
         syncCards();
     }
 
-    /** events.json → event 테이블 (이벤트 번호/이름/기간) */
     public void syncEvents() {
         try {
             String json = restTemplate.getForObject(EVENTS_JSON_URL, String.class);
@@ -123,8 +121,7 @@ public class SekaiCrawlerScheduler {
             log.error("카드 마스터 동기화 에러", e);
         }
     }
-
-    /** 10분마다 랭킹 수집 */
+    //10분마다 랭킹 수집함
     @Scheduled(fixedRate = 600000, initialDelay=600000)
     @Transactional
     public void collectRankingData() {
@@ -154,7 +151,7 @@ public class SekaiCrawlerScheduler {
                         .orElseGet(() -> eventRepository.save(new Event(currentEventId)));
             }
 
-            LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
+            LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Tokyo")).truncatedTo(ChronoUnit.MINUTES);
             if (snapshotRepository.existsByEventIdAndRecordedAt(currentEventId, now)) {
                 log.info("이미 {} 시각 스냅샷이 있어 수집 생략", now);
                 return;
@@ -222,7 +219,7 @@ public class SekaiCrawlerScheduler {
     }
 
     private LocalDateTime toLocal(long epochMillis) {
-        return LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), ZoneId.systemDefault());
+        return LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), ZoneId.of("Asia/Tokyo"));
     }
     //DB에 저장된 데이터를 비운다.
     private void evictRankingCachesAfterCommit() {

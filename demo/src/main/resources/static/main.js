@@ -1,5 +1,5 @@
 const DEFAULT_CARD = 'https://storage.sekai.best/sekai-jp-assets/thumbnail/chara/res001_no001_normal.webp';
-const MAIN_RANKS = '10, 20, 30, 50, 100, 200, 300, 500,1000,2000, 3000,5000,10000,30000,50000,100000';
+const MAIN_RANKS = '10, 50, 100, 500,1000,5000,10000,50000,100000';
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5분마다 자동 갱신
 
 let chartInstance = null;
@@ -13,11 +13,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await loadEventOptions();
 
-    // 선택된 이벤트 데이터를 주기적으로 갱신
+    //선택된 이벤트 데이터를 주기적으로 갱신
     setInterval(() => {
         if (currentEventId) refreshAll(currentEventId);
     }, REFRESH_INTERVAL_MS);
 });
+
+/* 이벤트 정식 명칭 추출 함수*/
+function getEventName(eventId){
+    const select = document.getElementById('eventSelect');
+    //배열의 0번째(배열은 첫 이벤트를 고정으로 들고오는게 아니라, 사용자가 드롭다운에서 선택한 현재 선택된 옵션 태그를 의미함)
+    if(select&&select.selectedOptions[0]){
+        const fullName = select.selectedOptions[0].textContent;
+        return fullName.replace(/^\[\d+회\]\s*/, '').trim();
+    }
+    return `이벤트 ${eventId}`;
+}
 
 /** 이벤트 목록을 채우고 현재 진행 중(또는 최신) 이벤트를 자동 선택 */
 async function loadEventOptions() {
@@ -65,9 +76,8 @@ function selectEvent(eventId) {
     currentEventId = eventId;
 
     const select = document.getElementById('eventSelect');
-    const selectedText = select && select.selectedOptions[0] ? select.selectedOptions[0].textContent : `이벤트 ${eventId}`;
     const title = document.getElementById('rankingTitle');
-    if (title) title.innerText = `최신 랭킹 리더보드 - ${selectedText}`;
+    if (title) title.innerText = `랭킹 리더보드`;
 
     refreshAll(eventId);
 }
@@ -150,6 +160,7 @@ async function loadLatestRankings(eventId) {
 /** 단일 등수 커트라인 조회 */
 async function loadSingleRankTrend(eventId, rankNum) {
     const chartTitle = document.getElementById('chartTitle');
+    const eventName = getEventName(eventId);
     try {
         const response = await fetch(`/api/events/${eventId}/cutoffs?ranks=${rankNum}`);
         if (!response.ok) throw new Error(`컷트라인 에러: ${response.status}`);
@@ -160,8 +171,18 @@ async function loadSingleRankTrend(eventId, rankNum) {
             return;
         }
 
-        if (chartTitle) chartTitle.innerText = `이벤트 ${eventId} - ${rankNum}위 컷트라인 점수 추이`;
+        if (chartTitle)
+        chartTitle.innerHTML = `
+                        <span>${escapeHtml(eventName)}<br>${rankNum}위 컷트라인 점수 추이</span>
+                        <button type="button" id="btnBackToMainCutoffs" style="margin-left: 10px; padding: 3px 8px; font-size: 0.85rem; cursor: pointer;">
+                            ↩ 주요 등수 컷트라인 보기
+                        </button>
+                    `;
 
+                    // 버튼 클릭 시 주요 등수 커트라인 조회 함수(loadCutoffTrend) 호출
+                    document.getElementById('btnBackToMainCutoffs')?.addEventListener('click', () => {
+                        loadCutoffTrend(eventId);
+                    });
         const datasets = [{
             label: `${rankNum}위 컷 점수`,
             data: trendData.map(point => pickScore(point, rankNum)),
@@ -182,7 +203,8 @@ async function loadSingleRankTrend(eventId, rankNum) {
 /** 주요 등수 커트라인 조회 */
 async function loadCutoffTrend(eventId) {
     const chartTitle = document.getElementById('chartTitle');
-    if (chartTitle) chartTitle.innerText = `이벤트 ${eventId} 주요 등수 컷트라인 점수 추이`;
+    const eventName = getEventName(eventId);
+    if (chartTitle) chartTitle.innerText = `${eventName}\n주요 등수 컷트라인 점수 추이`;
 
     try {
         const response = await fetch(`/api/events/${eventId}/cutoffs?ranks=${MAIN_RANKS}`);
@@ -212,6 +234,7 @@ async function loadCutoffTrend(eventId) {
         renderChart(makeLabels(trendData), datasets);
     } catch (err) {
         console.error('컷트라인 로딩 에러', err);
+        //로딩 안될때 확인한 디버거
         destroyChart();
     }
 }

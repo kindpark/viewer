@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -32,7 +33,7 @@ public class RankingService {
     private final CardMasterRepository cardMasterRepository;
     private final EventRepository eventRepository;
 
-    // 최신 리더보드: 스냅샷에 저장된 cardId로 카드 마스터를 매핑
+    //최신 리더보드: 스냅샷에 저장된 cardId로 카드 마스터를 매핑
     //캐시 히트일때도 DB 커넥션이 열릴수 있어서, 캐시랑 부딪힐수 있는 트렌젝션 삭제하고 캐시 추가
 
     @Cacheable(value="lastestRanking", key="#eventId", sync=true)
@@ -49,7 +50,7 @@ public class RankingService {
 
         Map<Long, CardMaster> cardMap = cardMasterRepository.findAllById(cardIds).stream()
                 .collect(Collectors.toMap(CardMaster::getId, c -> c, (a, b) -> a));
-
+        //카드가 올바로 전달됐는지 확인하는 디버거
         log.debug("리더보드 조회 event={} 카드 {}종 / 마스터 매핑 {}종", eventId, cardIds.size(), cardMap.size());
 
         return snapshots.stream().map(s -> {
@@ -68,6 +69,7 @@ public class RankingService {
                 afterTraining = Boolean.TRUE.equals(s.getAfterTraining()) && canAfter;
                 iconUrl = afterTraining ? card.getAfterTrainingImageUrl() : card.getNormalImageUrl();
             } else if (s.getCardId() != null) {
+                //카드 마스터가 올바로 전송됐는지 확인하는 디버거
                 log.warn("카드 마스터에 없는 cardId={} (user {})", s.getCardId(), s.getUserId());
             }
 
@@ -99,7 +101,7 @@ public class RankingService {
     /** 현재 진행 중인 이벤트, 없으면 데이터가 있는 가장 최근 이벤트 */
     @Transactional(readOnly = true)
     public Optional<Event> getCurrentEvent() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Tokyo"));
         List<Event> withData = getEventsWithData();
         return withData.stream()
                 .filter(e -> e.getStartAt() != null && e.getAggregateAt() != null
@@ -115,34 +117,6 @@ public class RankingService {
         if (targetRanks == null || targetRanks.isEmpty()) {
             return new CutoffTrendResponseDto(eventId, Collections.emptyList());
         }
-/*
-        List<EventRankingSnapshot> snapshots =
-                snapshotRepository.findCutoffTrendsByEventIdAndRanks(eventId, targetRanks);
-
-        if (snapshots.isEmpty()) {
-            return new CutoffTrendResponseDto(eventId, Collections.emptyList());
-        }
-                Map<LocalDateTime, Map<Integer, Long>> groupedByTime = snapshots.stream()
-                .collect(Collectors.groupingBy(
-                        EventRankingSnapshot::getRecordedAt,
-                        TreeMap::new,
-                        Collectors.toMap(
-                                EventRankingSnapshot::getRankNum,
-                                EventRankingSnapshot::getScore,
-                                (existing, replacement) -> existing
-                        )
-                ));
-
-        List<LocalDateTime> times = new ArrayList<>(groupedByTime.keySet());
-        Collections.sort(times);
-        List<LocalDateTime> sampledTimes = sampleTimes(times, 15);
-
-        List<CutoffTrendResponseDto.RankTrendPoint> trendData = sampledTimes.stream()
-                .map(time -> new CutoffTrendResponseDto.RankTrendPoint(time, groupedByTime.get(time)))
-                .collect(Collectors.toList());
-
-        return new CutoffTrendResponseDto(eventId, trendData);
-*/
         //시점 목록만 조회한다. 일단 15개로 샘플링
         List<LocalDateTime> allTimes = snapshotRepository.findDistinctRecordedAtByEventId(eventId);
         if(allTimes.isEmpty()){
