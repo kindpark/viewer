@@ -58,4 +58,12 @@ public class RankingController {
         List<Event> events = eventRepository.findAllByOrderByEventIdDesc();
         return ResponseEntity.ok(events);
     }
+    // 최신(현재) 이벤트 정보 조회 API
+    @GetMapping("/current")
+    public ResponseEntity<Event> getCurrentEvent() {
+        return eventRepository.findAllByOrderByEventIdDesc().stream()
+                .findFirst()
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
 }

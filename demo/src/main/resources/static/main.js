@@ -4,6 +4,7 @@ const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5분마다 자동 갱신
 
 let chartInstance = null;
 let currentEventId = null;
+let inlineChartInstance=null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     const select = document.getElementById('eventSelect');
@@ -143,12 +144,9 @@ async function loadLatestRankings(eventId) {
                 <td>${item.score ? Number(item.score).toLocaleString() : 0}</td>
             `;
 
-            tr.addEventListener('click', () => {
-                if (actualRank !== undefined && actualRank !== null) {
-                    loadSingleRankTrend(eventId, actualRank);
-                }
-            });
-
+          tr.addEventListener('click', () => {
+              toggleInlineRankTrend(tr, eventId, actualRank);
+          });
             tableBody.appendChild(tr);
         });
     } catch (err) {
@@ -293,4 +291,86 @@ function escapeHtml(text) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+}
+
+/** 아코디언 인라인 차트 토글 함수 */
+async function toggleInlineRankTrend(clickedRow, eventId, rankNum) {
+    const nextRow = clickedRow.nextElementSibling;
+
+    // 1. 이미 하단에 해당 랭킹의 차트 행이 열려있다면 삭제 후 종료 (다시 클릭해서 가리기)
+    if (nextRow && nextRow.classList.contains('inline-chart-row')) {
+        if (inlineChartInstance) {
+            inlineChartInstance.destroy();
+            inlineChartInstance = null;
+        }
+        nextRow.remove();
+        return;
+    }
+
+    // 2. 다른 행에 열려있던 인라인 차트 행이 있다면 먼저 청소
+    document.querySelectorAll('.inline-chart-row').forEach(row => row.remove());
+    if (inlineChartInstance) {
+        inlineChartInstance.destroy();
+        inlineChartInstance = null;
+    }
+
+    // 3. 누른 행 바로 아래에 차트가 들어갈 <tr> 행 동적 삽입
+    const chartRow = document.createElement('tr');
+    chartRow.classList.add('inline-chart-row');
+    chartRow.innerHTML = `
+        <td colspan="4" style="background-color: #fafafa; padding: 15px;">
+            <div style="font-weight: bold; margin-bottom: 8px; font-size: 0.9rem; color: #555;">
+                📊 ${rankNum}위 실시간 컷트라인 점수 추이
+            </div>
+            <div class="chart-container" style="position: relative; height: 260px; width: 100%;">
+                <canvas id="inlineTrendChart"></canvas>
+            </div>
+        </td>
+    `;
+    clickedRow.after(chartRow);
+
+    // 4. API 호출 및 차트 빌드
+    try {
+        const response = await fetch(`/api/events/${eventId}/cutoffs?ranks=${rankNum}`);
+        if (!response.ok) throw new Error(`컷트라인 에러: ${response.status}`);
+
+        const trendData = (await response.json()).trendData;
+        if (!Array.isArray(trendData) || trendData.length === 0) {
+            chartRow.innerHTML = `<td colspan="4" style="text-align:center; padding:10px; color:#999;">추이 데이터가 없습니다.</td>`;
+            return;
+        }
+
+        const canvas = document.getElementById('inlineTrendChart');
+        if (!canvas) return;
+
+        const datasets = [{
+            label: `${rankNum}위 점수`,
+            data: trendData.map(point => pickScore(point, rankNum)),
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.1)',
+            tension: 0.2,
+            spanGaps: true,
+            fill: true
+        }];
+
+        // 클릭된 유저 전용 독립 차트 인스턴스 생성
+        inlineChartInstance = new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: { labels: makeLabels(trendData), datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { display: false } }, // 공간 확보를 위해 범례 숨김
+                scales: {
+                    y: { ticks: { callback: value => Number(value).toLocaleString(), font: { size: 10 } } },
+                    x: { ticks: { font: { size: 9 }, maxRotation: 45 } }
+                }
+            }
+        });
+
+    } catch (err) {
+        console.error('인라인 컷트라인 로딩 에러', err);
+        chartRow.innerHTML = `<td colspan="4" style="text-align:center; padding:10px; color:red;">데이터를 불러오지 못했습니다.</td>`;
+    }
 }

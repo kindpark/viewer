@@ -22,6 +22,7 @@ WORKDIR /app
 # 명확하게 지정된 project.jar만 컨테이너로 가져옵니다.
 COPY --from=build /app/build/libs/project.jar app.jar
 
+RUN mkdir -p /app/cards
 # 컨테이너 포트 노출
 EXPOSE 8080
 
