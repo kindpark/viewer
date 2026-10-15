@@ -36,7 +36,8 @@
 
 상단 범례의 등수 칸을 클릭하여 원하는 주요 커트라인(10위, 100위 등)만 선택적으로 그래프에 표시할 수 있습니다.
 
-<img width="455" alt="Filter Cutoffs" src="https://github.com/user-attachments/assets/f7cd6354-0075-496a-9dc7-9134b7ee5702" />
+<img width="432" height="539" alt="image" src="https://github.com/user-attachments/assets/a5938084-d2a2-49bb-8330-1c0b4b6c576f" />
+
 
 ---
 
