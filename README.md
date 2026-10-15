@@ -54,6 +54,11 @@
 
 <img width="1126" alt="User Request Flow" src="https://github.com/user-attachments/assets/81b93014-fed2-4555-a8d0-b8c71e994509" />
 
+### 3. 시스템 아키텍쳐 다이어그램
+
+<img width="1060" height="822" alt="image" src="https://github.com/user-attachments/assets/a31d29da-cd2b-4c19-a711-57faf82058f9" />
+
+
 ---
 
 ## 🗄 데이터베이스 구조 (Data Schema)
