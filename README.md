@@ -18,7 +18,7 @@
 
 10분 간격으로 수집되는 실시간 랭킹 정보를 확인하고, 각 유저를 클릭하여 점수 변화 그래프를 관찰할 수 있습니다.
 
-| 데스크톱 뷰 | 모바일 뷰 |
+| 데스크톱 뷰 | 모바일/태블릿 뷰 |
 | :---: | :---: |
 | <img width="885" alt="Desktop View" src="https://github.com/user-attachments/assets/a3118558-ebae-4bba-8ea3-6f1684934932" /> | <img width="698" alt="Mobile View" src="https://github.com/user-attachments/assets/a2a45d10-abf1-47e8-ac90-8663fc39c8c0" /> |
 
@@ -26,7 +26,7 @@
 
 ### 2. 지난 이벤트 랭킹 조회
 
-프로젝트 실행 이후 기록된 прошлый 이벤트들의 랭킹 및 커트라인 데이터를 언제든지 조회할 수 있습니다.
+프로젝트 실행 이후 기록된 이벤트들의 랭킹 및 커트라인 데이터를 언제든지 조회할 수 있습니다.
 
 <img width="918" alt="Past Event Analysis" src="https://github.com/user-attachments/assets/9f3d29b6-60b3-4019-a704-927c48283417" />
 
