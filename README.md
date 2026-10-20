@@ -1,4 +1,4 @@
-qwmvkdid.duckdns.org
+[qwmvkdid.duckdns.org](https://qwmvkdid.duckdns.org/)
 
 # 📊 게임 실시간 랭킹 & 커트라인 추이 서비스 (sekai-viewer)
 
